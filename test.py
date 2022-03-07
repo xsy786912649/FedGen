@@ -36,7 +36,7 @@ class Model(torch.nn.Module):
         x = F.relu(x)
 
         x = F.linear(x, params[6], params[7])
-        x = (F.sigmoid(x)*2.0 - 1.0)*(1.0/math.sqrt(3))
+        
         return x
 
     def input_process(self, x):
@@ -48,7 +48,9 @@ class Model(torch.nn.Module):
         return torch.cat((x_position,x_sin,x_cos,x_sin_2,x_cos_2), 1)
 
     def forward(self, x, params):
-        return self.dense(self.input_process(x), params)
+        x = self.dense(self.input_process(x), params)
+        u = (F.sigmoid(x)*2.0 - 1.0)*(1.0/math.sqrt(3))
+        return u
 
 def predict(model, pre_x):
     outputs=[]
@@ -59,7 +61,6 @@ def predict(model, pre_x):
         outputs = output.cpu().numpy()
     outputs=np.array(outputs)
     return outputs
-
 
 x=np.array([[1,2,3]])
 print(x[0,:2])
