@@ -11,8 +11,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class nn_controller(torch.nn.Module):
     def __init__(self):
         super(nn_controller, self).__init__()
+        self.obs_n=10
         self.params = [
-                    torch.Tensor(256, 6).uniform_(-1./math.sqrt(6), 1./math.sqrt(6)).requires_grad_(),
+                    torch.Tensor(256, 6+self.obs_n*2).uniform_(-1./math.sqrt(6), 1./math.sqrt(6)).requires_grad_(),
                     torch.Tensor(256).zero_().requires_grad_(),
 
                     torch.Tensor(256, 256).uniform_(-1./math.sqrt(256), 1./math.sqrt(256)).requires_grad_(),
@@ -40,12 +41,12 @@ class nn_controller(torch.nn.Module):
         return x
 
     def input_process(self, x):
-        x_position,x_theta=x.split([2,1],dim=1)
+        x_position,x_theta,x_obs=x.split([2,1,2*self.obs_n],dim=1)
         x_sin=torch.sin(x_theta)
         x_cos=torch.cos(x_theta)
         x_sin_2=torch.sin(2*x_theta)
         x_cos_2=torch.cos(2*x_theta)
-        return torch.cat((x_position,x_sin,x_cos,x_sin_2,x_cos_2), 1)
+        return torch.cat((x_position,x_sin,x_cos,x_sin_2,x_cos_2,x_obs), 1)
 
     def forward(self, x, params):
         x = self.dense(self.input_process(x), params)
@@ -61,3 +62,10 @@ class nn_controller(torch.nn.Module):
             outputs = output.cpu().numpy()
         outputs=np.array(outputs)
         return outputs
+
+    def save_model(self, id, iteration):
+        torch.save(self, './pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl') 
+
+
+if __name__=='__main__':
+    model = torch.load('./pkl/robot'+str(id)+'_'+'iteration'+str(0)+'.pkl')
