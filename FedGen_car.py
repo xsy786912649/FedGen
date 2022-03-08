@@ -189,15 +189,14 @@ class robot:
     def kruzkov_transform(self,t):
         return 1-exp(-self.alpha*(t+1))
 
-    def reward(self,stop_state,t,is_goal=True, timeout=False):
-        reward0=1
+    def reward(self,stop_state,t,is_goal=True, timeout=False): 
+        reward0=1 
         if is_goal==True: 
             reward0=self.kruzkov_transform(t)-1 
-        elif timeout==True:
+        elif timeout==True: 
             reward0= np.linalg.norm(stop_state[0,:2]-self.goal)*np.linalg.norm(stop_state[0,:2]-self.goal)/2.0 
+        return reward0 
         
-        return reward0
-            
     def run_setup(self,goal,init,obs):
         self.init=init
         self.x=init
@@ -276,7 +275,7 @@ class robot:
 #            print(str(robo.id)+' data written!!')
         fw.close()
 
-    def local_update(self,T,random_seed,Z,i,lock):
+    def local_update(self,T,random_seed,Z,i,lock,test_seed):
         file='./pkl/robot'+str(self.id)+'_'+str(self.n_obs)+'.pkl'
 
         lock.acquire()
@@ -292,7 +291,7 @@ class robot:
             self.theta_=robot_data['theta']
             self.local_converge=robot_data['local_converge']
             self.local_converge_theta=robot_data['local_converge_theta']
-            self.collect_y(T,random_seed)
+            self.collect_y(T,random_seed,test_seed)
             robot_data['y']=self.y
             lock.acquire()
             print(str(self.id)+' local updating y = ', end='')
@@ -307,7 +306,7 @@ class robot:
 #                self.Theta.append(self.theta_)
 #                robot_data['Theta'].append(self.theta_)
                 robot_data['Y'].append(self.y)
-                if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #??????????????????????
+                if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #!!!!!!!!!!!!!!!!!!!
                     self.theta_=self.theta_-self.z*self.r#/(i+1)                    
                     self.Y.append(self.y)
 #                    robot_data['Y'].append(self.y)
@@ -332,18 +331,18 @@ class robot:
             
             elif len(self.Theta)==1:
                 self.reinitialize(random_seed)
-                self.local_update(T,random_seed+1,Z,i,lock)
+                self.local_update(T,random_seed+1,Z,i,lock,test_seed)
                 print('local updated')
             
         print(self.id, 'Done local update!  ', "convergence: ", str(self.converge))
                 
-    def collect_y(self,T,random_seed):
+    def collect_y(self,T,random_seed,test_seed):
         y=0
         np.random.seed(random_seed)
         for E in range(self.n_E):
-            goal, init, obs=env_config(self.n_obs,random_seed=None)
+            goal, init, obs=env_config(self.n_obs,random_seed=test_seed+100*E)
             for j in range(self.n_init):
-                _, init,_=env_config(self.n_obs,random_seed=None)
+                _, init,_=env_config(self.n_obs,random_seed=j+test_seed+100*E)
 
                 self.run_setup(goal,init,obs)
                 eta=0
@@ -357,8 +356,7 @@ class robot:
                         eta=1
                         break
                     if Goal:   
-                        print(t)
-                        #eta=self.kruzkov_transform(t) 
+                        #print(t)
                         eta=self.reward(current_x,t,True,False)
                         break                      
                 if not Collision and not Goal:
@@ -369,7 +367,7 @@ class robot:
         self.y=y
         return y
 
-    def zeroth_gradient(self,T,goal,init,obs,eta,E,random_seed,Z):
+    def zeroth_gradient(self,T,goal,init,obs,eta,E,random_seed,Z): #!!!!!!!!!!!!!!!!!!!
         z=0
         for k in range(Z):
             delta=np.random.normal(0,1,self.theta.shape)      
@@ -392,7 +390,7 @@ class robot:
     def collect_z(self,T,random_seed,Z):
         z_k=0
         np.random.seed(random_seed)
-        n_E=int(self.n_E/5)
+        n_E=int(self.n_E/10)
         n_init=self.n_init
         for E in range(n_E):
             goal, init, obs=env_config(self.n_obs,random_seed=None)
@@ -411,7 +409,7 @@ class robot:
                         eta=self.reward(current_x,t,True,False)
                         break
                 if not Collision and not Goal:
-                    eta=self.reward(current_x,t,True,False)
+                    eta=self.reward(current_x,t,False,True)
 
                 z=self.zeroth_gradient(T,goal,init,obs,eta,E,random_seed,Z)
             z_k=z_k+z
@@ -441,7 +439,7 @@ def dubin_car(x,u,E):
     x_=np.zeros(x.shape)
     x_[0,0]=np.cos(x[0,2])+d
     x_[0,1]=np.sin(x[0,2])
-    x_[0,2]=1/0.03*u     #u=[-1/np.sqrt(3),1/np.sqrt(3)] (2*sigmoid(u)-1)/np.sqrt(3.0) -30~30
+    x_[0,2]=u/0.03     #u=[-1/np.sqrt(3),1/np.sqrt(3)] (2*sigmoid(u)-1)/np.sqrt(3.0) -30~30
 
     x_go=x+time_interval*x_
     if x_go[0,2]<0:
@@ -535,7 +533,7 @@ if __name__=='__main__':
     n_obs=10
     obs_size=0.03
     goal_size=0.05
-    n_E=20
+    n_E=30
     n_init=5
     
     #optimization parameter
@@ -548,7 +546,7 @@ if __name__=='__main__':
     
     #FedGen parameter
     gamma=0.01
-    ell=0.01 #Lipschitz constant
+    ell=0.003 #Lipschitz constant
     
     q=np.sqrt(2*np.log(2/gamma)/n_E/n_init)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/n_init/2)
@@ -579,8 +577,7 @@ if __name__=='__main__':
     for i in range(K):
         print('Iteration '+str(i))
         for robo in robo_network:
-            p=mp.Process(target=robo.local_update, args=(T,i+robo.id*20,Z,i,lock,))
-#            robo.local_update(T,i+robo.id*20,alpha,Z,i)
+            p=mp.Process(target=robo.local_update, args=(T,i+robo.id*20,Z,i,lock,500+i*1000,))
             Process.append(p)
             p.start()
         for p in Process:
