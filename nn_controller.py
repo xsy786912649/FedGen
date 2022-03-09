@@ -1,3 +1,4 @@
+from re import A
 import numpy as np
 import torch
 from torch import nn 
@@ -12,17 +13,18 @@ class nn_controller(torch.nn.Module):
     def __init__(self):
         super(nn_controller, self).__init__()
         self.obs_n=10
+        self.goal_n=1
         self.params = [
-                    torch.Tensor(256, 6+self.obs_n*2).uniform_(-1./math.sqrt(6), 1./math.sqrt(6)).requires_grad_(),
-                    torch.Tensor(256).zero_().requires_grad_(),
-
-                    torch.Tensor(256, 256).uniform_(-1./math.sqrt(256), 1./math.sqrt(256)).requires_grad_(),
-                    torch.Tensor(256).zero_().requires_grad_(),
-
-                    torch.Tensor(128, 256).uniform_(-1./math.sqrt(256), 1./math.sqrt(256)).requires_grad_(),
+                    torch.Tensor(128, 6+self.goal_n*2+self.obs_n*2).uniform_(-1./math.sqrt(6), 1./math.sqrt(6)).requires_grad_(),
                     torch.Tensor(128).zero_().requires_grad_(),
 
-                    torch.Tensor(1, 128).uniform_(-1./math.sqrt(128), 1./math.sqrt(128)).requires_grad_(),
+                    torch.Tensor(128, 128).uniform_(-1./math.sqrt(128), 1./math.sqrt(128)).requires_grad_(),
+                    torch.Tensor(128).zero_().requires_grad_(),
+
+                    torch.Tensor(64, 128).uniform_(-1./math.sqrt(128), 1./math.sqrt(128)).requires_grad_(),
+                    torch.Tensor(128).zero_().requires_grad_(),
+
+                    torch.Tensor(1, 64).uniform_(-1./math.sqrt(64), 1./math.sqrt(64)).requires_grad_(),
                     torch.Tensor(1).zero_().requires_grad_(),
                 ]
 
@@ -41,7 +43,7 @@ class nn_controller(torch.nn.Module):
         return x
 
     def input_process(self, x):
-        x_position,x_theta,x_obs=x.split([2,1,2*self.obs_n],dim=1)
+        x_position,x_theta,x_obs=x.split([2,1,self.goal_n*2+self.obs_n*2],dim=1)
         x_sin=torch.sin(x_theta)
         x_cos=torch.cos(x_theta)
         x_sin_2=torch.sin(2*x_theta)
@@ -61,11 +63,24 @@ class nn_controller(torch.nn.Module):
             output = self.forward(inputs, self.params) 
             outputs = output.cpu().numpy()
         outputs=np.array(outputs)
-        return outputs
+        return float(outputs)
 
     def save_model(self, id, iteration):
-        torch.save(self, './pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl') 
+        return torch.save(self, './pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl') 
 
+    def save_model_global(self,iteration):
+        return torch.save(self, './pkl/robot_global'+'_'+'iteration'+str(iteration)+'.pkl') 
+
+
+def load_model(id, iteration):
+    return torch.load('./pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl')
+
+def load_model_global(iteration):
+    return torch.load('./pkl/robot_global'+'_'+'iteration'+str(iteration)+'.pkl')
 
 if __name__=='__main__':
-    model = torch.load('./pkl/robot'+str(id)+'_'+'iteration'+str(0)+'.pkl')
+    a= nn_controller()
+    b=a
+    c=a
+    b.obs_n=12
+    print(a.obs_n)

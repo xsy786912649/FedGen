@@ -32,27 +32,33 @@ import time
 np.random.seed(11)  
 import multiprocessing as mp
 import nn_controller
+from nn_controller import load_model
+from nn_controller import load_model_global
+
+import torch
+from torch import nn 
+from torch.utils.data import Dataset,DataLoader,TensorDataset
+from torchvision import datasets, transforms
+from torch.nn import functional as F
 
 
 
-def test_robot(robo,T,num,lock):
+def test_robot(robo,T,num,iteration_N,lock):
     file='./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl'
     f=open(file,'rb')
     robo_data=pickle.load(f)
-    robo.Theta=robo_data['Theta']
-#        for theta in robo_data['Theta']:
-    tt=robo.testing_all(T,num)
+    tt=robo.testing_all(T,num,iteration_N)
     robo_data['testing_Y']=robo.testing_Y
     robo_data['testing_col']=robo.testing_col
     robo_data['t_theta']=tt
+    '''
     if robo_data['local_converge']:
         theta=robo_data['local_converge_theta']
         y,col=robo.testing_one(T,num,theta)
         robo_data['local_converge_test_y']=y
         robo_data['local_converge_test_col']=col
+    '''
     
-#        Y.append(y)
-#        COL.append(col/num)
     fw=open('./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl','wb')
     pickle.dump(robo_data,fw)
     fw.close()
@@ -63,7 +69,7 @@ class robot:
     """
     each robot records its own state (x), data collected (X,y), prediction on Z_M (Z_M)
     """
-    def __init__(self,dynamics,goal_size,obs_size,n_E,n_init,n_obs,n_theta,q,s,robo_id,zeta,r,theta,m_g,m_obs,alpha):
+    def __init__(self,dynamics,goal_size,obs_size,n_E,n_init,n_obs,n_theta,q,s,robo_id,zeta,r,controller,alpha): 
         self.init=None
         self.x=None
         
@@ -74,13 +80,12 @@ class robot:
         self.obs=None
         self.goal=None
         self.X_=None
-        self.theta=None
+        #self.theta=None
         self.dynamics=dynamics
         self.u=None
         self.n_E=n_E
         self.n_init=n_init
         self.Y=[]
-        self.Theta=[(-1,theta)]
         self.n_theta=n_theta
         self.q=q
         self.s=s
@@ -88,19 +93,16 @@ class robot:
         self.zeta=zeta
         self.y=None
         self.z=None
+        self.z_norm=None
         self.r=r
-        self.theta=theta
-        self.m_g=m_g
-        self.m_obs=m_obs
         self.converge=False
-        self.theta=theta
-        self.theta_=theta
+        self.controller=controller
         self.testing_Y=None
         self.testing_y=None
         self.testing_col=None
         self.alpha=alpha
         self.local_converge=False
-        self.local_converge_theta=None
+        #self.local_converge_theta=None
         
         
         file='./pkl/robot'+str(self.id)+'_'+str(n_obs)+'obs'+'.pkl'
@@ -108,7 +110,6 @@ class robot:
         robot_data=dict()
         robot_data['Y']=[]
         robot_data['y']=None
-        robot_data['Theta']=[(-1,theta)]
         robot_data['nE']=n_E
         robot_data['alpha']=alpha
         robot_data['ninit']=n_init
@@ -116,16 +117,15 @@ class robot:
         robot_data['s']=s
         robot_data['q']=q
         robot_data['converge']=False
-        robot_data['theta']=theta
-        robot_data['theta_0']=theta
-        robot_data['z']=None
+        self.controller.save_model(self.id,0)
+        robot_data['z_norm']=None
         robot_data['n_obs']=n_obs
         robot_data['r']=r
         robot_data['Switch']=[]
         robot_data['goal_size']=goal_size
         robot_data['obs_size']=obs_size
         robot_data['local_converge']=False
-        robot_data['local_converge_theta']=None
+        #robot_data['local_converge_theta']=None
         robot_data['testing_Y']=None
         robot_data['testing_col']=None
         robot_data['local_converge_test_y']=None
@@ -133,10 +133,10 @@ class robot:
         robot_data['zeta']=1
         pickle.dump(robot_data,f)
     
-    def testing_one(self, T,num,theta):
+    def testing_one(self, T,num, controller):
         y=0
         col=0
-        self.theta=theta
+        self.controller=controller
 #        np.random.seed(10000)
         for E in range(num):
             goal, init,obs=env_config(self.n_obs,random_seed=E) 
@@ -145,7 +145,7 @@ class robot:
             for t in range(T):
                 
                 # print(self.goal)
-                Collision,Goal,current_x=self.run(E)
+                Collision,Goal,current_x=self.run(E,self.controller)
                 if Collision:
                     eta=1
                     col=col+1
@@ -166,25 +166,26 @@ class robot:
         
         return y,col
 
-    def testing_all(self,T,num):
+    def testing_all(self,T,num,iteration_N):
         Y=[]
         COL=[]
         cnt=1
         tt=[]
-        for i_theta in self.Theta:
-            theta=i_theta[1]
-            t=i_theta[0]
-            y,col=self.testing_one(T,num,theta)
+        for iteration in range(iteration_N):
+            controller=load_model(self.id,iteration)
+            t=iteration
+            y,col=self.testing_one(T,num,controller)
             Y.append(y)
             COL.append(col/num)
             tt.append(t)
-            print('Testing...robot '+str(self.id)+' '+str(cnt)+'/'+str(len(self.Theta))+' Done!')
+            print('Testing...robot '+str(self.id)+' '+str(cnt)+'/'+str(iteration_N)+' Done!')
             cnt=cnt+1
         print('Robot '+str(self.id)+' completes testing !!!!')
         self.testing_Y=Y
         self.testing_col=COL
         
         return tt
+
     
     def kruzkov_transform(self,t):
         return 1-exp(-self.alpha*(t+1))
@@ -221,20 +222,8 @@ class robot:
                 plt.legend()
         plt.plot(self.X[:,0],self.X[:,1])
 
-    def controller(self):
-        X=self.x[0,:2]-self.X_
-        X_norm=np.linalg.norm(X,axis=1)
-        # print(X_norm)
-        X_norm_clip=np.where(X_norm[1:]-self.obs_size<0,0,X_norm[1:]-self.obs_size)
-        # print(X_norm_clip)
-        X[1:,:]=X[1:,:]/(X_norm_clip*np.ones((len(X)-1,2)).T).T/self.theta[1]
-        X[0]=X[0]*self.theta[0]
 
-        u=np.sum(X,axis=0)
-
-        return u[0]/np.linalg.norm(u)
-
-    def run(self,E):
+    def run(self,E,controller):
         Collision=False
         Goal=False
 #        print(self.x)
@@ -245,8 +234,9 @@ class robot:
         elif self.x[0,0]>1 or self.x[0,0]<0 or self.x[0,1]>1 or self.x[0,1]<0:
             Collision=True
         else:
-            self.u=self.controller()
-            # print(u.T)
+            obs_flatten=self.obs.reshape((1,-1)) 
+            input=np.append(self.x,self.goal,obs_flatten,axis=1)
+            self.u=controller.predict(input)
 
             self.x=self.dynamics(self.x,self.u,E)  
 
@@ -254,26 +244,6 @@ class robot:
 
         return Collision, Goal, self.x
 
-    def reinitialize(self,random_seed):
-        file='./pkl/robot'+str(self.id)+'_'+str(self.n_obs)+'obs'+'.pkl'
-        fr=open(file,'rb')
-        robot_data=pickle.load(fr)
-        np.random.seed(random_seed)
-        theta_g=np.random.uniform(-1,0,(1,2))*self.m_g
-        theta=np.random.uniform(0,1,(1,2))*self.m_obs
-        theta=np.vstack((theta_g,theta))
-#                theta_g=np.random.normal(-1,0,(2,1))*self.m_g
-#                theta=np.random.normal(0,1,(2,1*n_obs))*self.m_obs
-        self.theta_=theta
-
-        robot_data['theta']=self.theta_
-#                robot_data['y']=self.y
-        robot_data['theta_0']=self.theta_
-        robot_data['Theta']=[(-1,theta)]
-        fw=open(file,'wb')                
-        pickle.dump(robot_data,fw)
-#            print(str(robo.id)+' data written!!')
-        fw.close()
 
     def local_update(self,T,random_seed,Z,i,lock,test_seed):
         for j in range(3):
@@ -286,60 +256,50 @@ class robot:
             lock.release()
 
             self.converge=robot_data['converge']
-            self.Theta=robot_data['Theta']
+            self.controller=load_model(self.id,i)
             if not self.converge:
-
-                self.theta_=robot_data['theta']
                 self.local_converge=robot_data['local_converge']
-                self.local_converge_theta=robot_data['local_converge_theta']
-                self.collect_y(T,random_seed,test_seed)
+                #self.local_converge_theta=robot_data['local_converge_theta']
+                self.collect_y(T,random_seed,test_seed,self.controller)
                 robot_data['y']=self.y
                 lock.acquire()
                 print(str(self.id)+' local updating y = ', end='')
                 print(self.y)
                 lock.release()
 
-                if self.y<1: 
-                    print(str(self.id)+' local updating z ... ')
-                    self.collect_z(T,random_seed,Z)
-                    robot_data['z']=self.z
-                    print(self.id,'Theta length = ',len(robot_data['Theta']), 'z norm = ',np.linalg.norm(self.z), 'Theshold = ',2*np.sqrt(self.n_theta)*self.q)
-    #                self.Theta.append(self.theta_)
-    #                robot_data['Theta'].append(self.theta_)
-                    robot_data['Y'].append(self.y)
-                    if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #!!!!!!!!!!!!!!!!!!!
-                        self.theta_=self.theta_-self.z*self.r#/(i+1)                    
-                        self.Y.append(self.y)
-    #                    robot_data['Y'].append(self.y)
-                        robot_data['theta']=self.theta_
-                        print('theta updated_one_time')
-                    else:
-                        self.converge=True
-                        robot_data['converge']=True
-                        if not self.local_converge:
-                            self.local_converge=True
-                            self.local_converge_theta=self.theta_
-                            robot_data['local_converge_theta']=self.theta_
-                            robot_data['local_converge']=True
-                            robot_data['local_converge_t']=i
+                #if self.y<1.1: 
+                print(str(self.id)+' local updating z ... ')
+                self.collect_z(T,random_seed,Z,self.controller)
+                robot_data['z_norm']=np.linalg.norm(self.z)
+                print(self.id, 'z norm = ',np.linalg.norm(self.z), 'Theshold = ',2*np.sqrt(self.n_theta)*self.q)
+                robot_data['Y'].append(self.y)
+                if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #!!!!!!!!!!!!!!!!!!!
+                    self.controller=self.controller.update(self.z, self.r)
+                    self.Y.append(self.y)
+                    self.controller.save_model(self.id, i+1)
+                    print('theta updated_one_time')
+                else:
+                    self.converge=True
+                    robot_data['converge']=True
+                    if not self.local_converge:
+                        self.local_converge=True
+                        #self.local_converge_theta=self.theta_
+                        #robot_data['local_converge_theta']=self.theta_
+                        self.controller.save_model(self.id, i+1)
+                        robot_data['local_converge']=True
+                        robot_data['local_converge_t']=i
 
-                    lock.acquire()
-                    fw=open(file,'wb')                
-                    pickle.dump(robot_data,fw)
-                    fw.close()
-                    lock.release()
-                    
-                '''
-                elif len(self.Theta)==1:
-                    self.reinitialize(random_seed)
-                    self.local_update(T,random_seed+1,Z,i,lock,test_seed)
-                    print('local updated')
-                '''
+                lock.acquire()
+                fw=open(file,'wb')                
+                pickle.dump(robot_data,fw)
+                fw.close()
+                lock.release()
                 print(self.id, 'Done local update!  ', "convergence: ", str(self.converge))
-                if (self.converge == True) and (self.y<1):
-                    break
+            else:
+                self.controller.save_model(self.id, i+1)
+        return
                 
-    def collect_y(self,T,random_seed,test_seed):
+    def collect_y(self,T,random_seed,test_seed,controller):
         y=0
         np.random.seed(random_seed)
         for E in range(self.n_E):
@@ -349,12 +309,11 @@ class robot:
 
                 self.run_setup(goal,init,obs)
                 eta=0
-                self.theta=self.theta_
 
                 current_x=self.x
                 for t in range(T):                   
                     # print(self.goal)                  
-                    Collision,Goal,current_x=self.run(E+random_seed*self.n_E)
+                    Collision,Goal,current_x=self.run(E+random_seed*self.n_E,controller)
                     if Collision:
                         eta=1
                         break
@@ -370,7 +329,7 @@ class robot:
         self.y=y
         return y
 
-    def zeroth_gradient(self,T,goal,init,obs,eta,E,random_seed,Z): #!!!!!!!!!!!!!!!!!!!
+    def zeroth_gradient(self,T,goal,init,obs,eta,E,random_seed,Z,controller): #!!!!!!!!!!!!!!!!!!!
         z=0
         for k in range(Z):
             delta=np.random.normal(0,1,self.theta.shape)      
@@ -378,7 +337,7 @@ class robot:
             self.run_setup(goal,init,obs)
             eta_=1
             for t in range(T):
-                Collision,Goal,current_x=self.run(E+random_seed*self.n_E)
+                Collision,Goal,current_x=self.run(E+random_seed*self.n_E,controller)
                 if Collision:
                     eta_=1
                     break
@@ -390,7 +349,7 @@ class robot:
             z=z+(eta_-eta)*delta 
         return z/Z
 
-    def collect_z(self,T,random_seed,Z):
+    def collect_z(self,T,random_seed,Z,controller):
         z_k=0
         np.random.seed(random_seed)
         n_E=int(self.n_E/10)
@@ -402,9 +361,8 @@ class robot:
 
                 self.run_setup(goal,init,obs)
                 eta=0
-                self.theta=self.theta_
                 for t in range(T):
-                    Collision,Goal,current_x=self.run(E+random_seed*self.n_E)
+                    Collision,Goal,current_x=self.run(E+random_seed*self.n_E,controller)
                     if Collision:
                         eta=1
                         break
@@ -451,7 +409,7 @@ def dubin_car(x,u,E):
         x_go[0,2]=x_go[0,2]-2*np.pi
     return x_go
     
-def cloud_update(file_global,robo_network):
+def cloud_update(file_global,robo_network,iteration):
     for robo in robo_network:
         try:
             f=open(file_global,'rb')
@@ -471,7 +429,8 @@ def cloud_update(file_global,robo_network):
                 global_min['y']=robo.y
                 global_min['s']=robo.s
                 global_min['id']=robo.id
-                global_min['theta']=robo.theta
+                controller_current=load_model(robo.id,iteration)
+                controller_current.save_model_global(iteration)
                 # global_min=np.array([robo.y,robo.s, robo.id])
                 f=open(file_global,'wb')
                 pickle.dump(global_min,f)
@@ -485,11 +444,12 @@ def cloud_update(file_global,robo_network):
             global_min['y']=robo_data['y']
             global_min['s']=robo.s
             global_min['id']=robo.id
-            global_min['theta']=robo_data['theta']
+            controller_current=load_model(robo.id,iteration)
+            controller_current.save_model_global(iteration)
             f=open(file_global,'wb')
             pickle.dump(global_min,f)
 
-def learner_fusion(robo_network):
+def learner_fusion(robo_network,iteration):
     for robo in robo_network:
         f=open(file_global,'rb')
         global_min=pickle.load(f)
@@ -501,29 +461,30 @@ def learner_fusion(robo_network):
         fr=open(file_r,'rb')
         robo_data=pickle.load(fr)
         robo.y=robo_data['y']
-        robo.z=robo_data['z']
-        robo.theta_=robo_data['theta']
+        robo.z_norm=robo_data['z_norm']
+        #robo.theta_=robo_data['theta']
+        robo.controller=load_model(robo.id,iteration+1)
         robo.zeta=robo_data['zeta']
         robo.converge=robo_data['converge']
-        if robo.id != id_j and y_j+s_j< robo.zeta and  y_j+s_j< robo.y-robo.s and np.linalg.norm(robo.z)<2*np.sqrt(robo.n_theta)*robo.q:
-            robo.theta_=global_min['theta']
+        if robo.id != id_j and y_j+s_j< robo.zeta and  y_j+s_j< robo.y-robo.s and robo.z_norm<2*np.sqrt(robo.n_theta)*robo.q:
+            robo.controller=load_model_global(iteration)
+            #robo.theta_=global_min['theta']
             robo.zeta=y_j
             robo.converge=False
             robo_data['converge']=robo.converge
-            robo_data['theta']=robo.theta_
+            #robo.controller.save_model(robo.id,iteration+1)
+            #robo_data['theta']=robo.theta_
             robo_data['zeta']=y_j
             robo_data['switch']=True
-            robo_data['Switch'].append((i,robo.theta_))
+            #robo_data['Switch'].append((iteration,robo.theta_))
             print('Robot ', robo.id, 'Switched to ',id_j,'!!!!')
-        if not robo.converge:
-            robo.Theta.append((i,robo.theta_))
-            robo_data['Theta'].append((i,robo.theta_))
-            print('Robot '+str(robo.id)+' Theta updated!')
-            fw=open('./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl','wb')
-            
-            pickle.dump(robo_data,fw)
-            
-            fw.close()
+        
+        print('Robot '+str(robo.id)+' theta updated!')
+        
+        robo.controller.save_model(robo.id,iteration+1)
+        fw=open('./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl','wb')
+        pickle.dump(robo_data,fw)
+        fw.close()
 
         
 if __name__=='__main__':
@@ -554,24 +515,20 @@ if __name__=='__main__':
     q=np.sqrt(2*np.log(2/gamma)/n_E/n_init)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/n_init/2)
     zeta=1
-    K=20
+    K=5
     print(q,s)
     robo_network=[]
-    n_robot=8
+    n_robot=2
     
     #Initialization
     for i in range(n_robot):
         #initialize theta
-        m_g=2
-        m_obs=10+i*10
-        theta_g=np.random.uniform(-1,0,(1,2))*m_g
-        theta=np.random.uniform(0,1,(1,2))*m_obs
-        theta=np.vstack((theta_g,theta))
-        theta_size=theta.size
+        controller=nn_controller()
+        theta_size=4
         #initialize robot
-        robo=robot(dubin_car,goal_size,obs_size,n_E,n_init,n_obs,theta.size,q,s,i,zeta,r,theta,10+i*10,m_obs,alpha)
+        robo=robot(dubin_car,goal_size,obs_size,n_E,n_init,n_obs,theta_size,q,s,i,zeta,r,controller,alpha) #(dynamics,goal_size,obs_size,n_E,n_init,n_obs,n_theta,q,s,robo_id,zeta,r,controller,alpha):
         robo_network.append(robo)
-        
+    
     bias=0
     file_global='./pkl/global_minimum'+str(n_obs)+'obs'+'.pkl'
     Process=[]
@@ -585,9 +542,9 @@ if __name__=='__main__':
             p.start()
         for p in Process:
             p.join()        
-        cloud_update(file_global,robo_network)
-        learner_fusion(robo_network)
-                
+        cloud_update(file_global,robo_network,i)
+        learner_fusion(robo_network,i)
+    
 #testing ..........................................
     print('testing............')
     Robot_Y=[]
@@ -595,7 +552,7 @@ if __name__=='__main__':
     
     P_test=[]
     for robo in robo_network:
-        p=mp.Process(target=test_robot,args=(robo,T,test_num,lock,))
+        p=mp.Process(target=test_robot,args=(robo,T,test_num,K+1,lock,))
         p.start()
         P_test.append(p)
     for p in P_test:

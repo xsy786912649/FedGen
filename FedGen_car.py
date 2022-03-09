@@ -237,7 +237,9 @@ class robot:
     def run(self,E):
         Collision=False
         Goal=False
-#        print(self.x)
+        #print(self.x)
+        #print(self.goal)
+        #print(self.obs)
         if np.linalg.norm(self.x[0,:2]-self.goal,ord=1)<self.goal_size:
             Goal=True
         elif any(np.linalg.norm(self.x[0,:2]-self.obs,axis=1)<self.obs_size):
@@ -471,7 +473,7 @@ def cloud_update(file_global,robo_network):
                 global_min['y']=robo.y
                 global_min['s']=robo.s
                 global_min['id']=robo.id
-                global_min['theta']=robo.theta
+                global_min['theta']=robo_data['Theta'][-1][-1] 
                 # global_min=np.array([robo.y,robo.s, robo.id])
                 f=open(file_global,'wb')
                 pickle.dump(global_min,f)
