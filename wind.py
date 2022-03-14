@@ -31,7 +31,7 @@ def wind(x,y,E):
             h=h+np.sqrt(2*S(th,U,cp)*dw*dth)*np.cos(k*x*np.cos(th)+k*y*np.sin(th)+phi[i,j])
             j=j+1
         i=i+1
-    return h*0.001*0.01
+    return h*0.001
 
 if __name__=='__main__':
     size=100

@@ -141,13 +141,13 @@ class robot:
         for E in range(num):
             goal, init,obs=env_config(self.n_obs,random_seed=E) 
             self.run_setup(goal,init,obs)
-            eta=0
+            eta=5
             for t in range(T):
                 
                 # print(self.goal)
                 Collision,Goal,current_x=self.run(E)
                 if Collision:
-                    eta=1
+                    eta=5
                     col=col+1
                     break
                 if Goal:
@@ -244,8 +244,8 @@ class robot:
             Goal=True
         elif any(np.linalg.norm(self.x[0,:2]-self.obs,axis=1)<self.obs_size):
             Collision=True
-        elif self.x[0,0]>1 or self.x[0,0]<0 or self.x[0,1]>1 or self.x[0,1]<0:
-            Collision=True
+        #elif self.x[0,0]>1 or self.x[0,0]<0 or self.x[0,1]>1 or self.x[0,1]<0:
+        #    Collision=True
         else:
             self.u=self.controller()
             # print(u.T)
@@ -278,68 +278,65 @@ class robot:
         fw.close()
 
     def local_update(self,T,random_seed,Z,i,lock,test_seed):
-        for j in range(3):
-            file='./pkl/robot'+str(self.id)+'_'+str(self.n_obs)+'obs'+'.pkl'
+        file='./pkl/robot'+str(self.id)+'_'+str(self.n_obs)+'obs'+'.pkl'
 
+        lock.acquire()
+        fr=open(file,'rb')
+        robot_data=pickle.load(fr)
+        fr.close()
+        lock.release()
+
+        self.converge=robot_data['converge']
+        self.Theta=robot_data['Theta']
+        if not self.converge:
+
+            self.theta_=robot_data['theta']
+            self.local_converge=robot_data['local_converge']
+            self.local_converge_theta=robot_data['local_converge_theta']
+            self.collect_y(T,random_seed,test_seed)
+            robot_data['y']=self.y
             lock.acquire()
-            fr=open(file,'rb')
-            robot_data=pickle.load(fr)
-            fr.close()
+            print(str(self.id)+' local updating y = ', end='')
+            print(self.y)
             lock.release()
 
-            self.converge=robot_data['converge']
-            self.Theta=robot_data['Theta']
-            if not self.converge:
+            if self.y<1: 
+                print(str(self.id)+' local updating z ... ')
+                self.collect_z(T,random_seed,Z)
+                robot_data['z']=self.z
+                print(self.id,'Theta length = ',len(robot_data['Theta']), 'z norm = ',np.linalg.norm(self.z), 'Theshold = ',2*np.sqrt(self.n_theta)*self.q)
+#                self.Theta.append(self.theta_)
+#                robot_data['Theta'].append(self.theta_)
+                robot_data['Y'].append(self.y)
+                if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #!!!!!!!!!!!!!!!!!!!
+                    self.theta_=self.theta_-self.z*self.r#/(i+1)                    
+                    self.Y.append(self.y)
+#                    robot_data['Y'].append(self.y)
+                    robot_data['theta']=self.theta_
+                    print('theta updated_one_time')
+                else:
+                    self.converge=True
+                    robot_data['converge']=True
+                    if not self.local_converge:
+                        self.local_converge=True
+                        self.local_converge_theta=self.theta_
+                        robot_data['local_converge_theta']=self.theta_
+                        robot_data['local_converge']=True
+                        robot_data['local_converge_t']=i
 
-                self.theta_=robot_data['theta']
-                self.local_converge=robot_data['local_converge']
-                self.local_converge_theta=robot_data['local_converge_theta']
-                self.collect_y(T,random_seed,test_seed)
-                robot_data['y']=self.y
                 lock.acquire()
-                print(str(self.id)+' local updating y = ', end='')
-                print(self.y)
+                fw=open(file,'wb')                
+                pickle.dump(robot_data,fw)
+                fw.close()
                 lock.release()
-
-                if self.y<1: 
-                    print(str(self.id)+' local updating z ... ')
-                    self.collect_z(T,random_seed,Z)
-                    robot_data['z']=self.z
-                    print(self.id,'Theta length = ',len(robot_data['Theta']), 'z norm = ',np.linalg.norm(self.z), 'Theshold = ',2*np.sqrt(self.n_theta)*self.q)
-    #                self.Theta.append(self.theta_)
-    #                robot_data['Theta'].append(self.theta_)
-                    robot_data['Y'].append(self.y)
-                    if np.linalg.norm(self.z)>= 2*np.sqrt(self.n_theta)*self.q:  #!!!!!!!!!!!!!!!!!!!
-                        self.theta_=self.theta_-self.z*self.r#/(i+1)                    
-                        self.Y.append(self.y)
-    #                    robot_data['Y'].append(self.y)
-                        robot_data['theta']=self.theta_
-                        print('theta updated_one_time')
-                    else:
-                        self.converge=True
-                        robot_data['converge']=True
-                        if not self.local_converge:
-                            self.local_converge=True
-                            self.local_converge_theta=self.theta_
-                            robot_data['local_converge_theta']=self.theta_
-                            robot_data['local_converge']=True
-                            robot_data['local_converge_t']=i
-
-                    lock.acquire()
-                    fw=open(file,'wb')                
-                    pickle.dump(robot_data,fw)
-                    fw.close()
-                    lock.release()
-                    
-                '''
-                elif len(self.Theta)==1:
-                    self.reinitialize(random_seed)
-                    self.local_update(T,random_seed+1,Z,i,lock,test_seed)
-                    print('local updated')
-                '''
-                print(self.id, 'Done local update!  ', "convergence: ", str(self.converge))
-                if (self.converge == True) and (self.y<1):
-                    break
+                
+            '''
+            elif len(self.Theta)==1:
+                self.reinitialize(random_seed)
+                self.local_update(T,random_seed+1,Z,i,lock,test_seed)
+                print('local updated')
+            '''
+            print(self.id, 'Done local update!  ', "convergence: ", str(self.converge))
                 
     def collect_y(self,T,random_seed,test_seed):
         y=0
@@ -358,7 +355,7 @@ class robot:
                     # print(self.goal)                  
                     Collision,Goal,current_x=self.run(E+random_seed*self.n_E)
                     if Collision:
-                        eta=1
+                        eta=5
                         break
                     if Goal:   
                         #print(t)
@@ -408,7 +405,7 @@ class robot:
                 for t in range(T):
                     Collision,Goal,current_x=self.run(E+random_seed*self.n_E)
                     if Collision:
-                        eta=1
+                        eta=5
                         break
                     if Goal:
                         eta=self.reward(current_x,t,True,False)
@@ -428,7 +425,7 @@ def env_config(n_obs,random_seed=None):
     if random_seed is not None:
         np.random.seed(random_seed)
     goal=np.random.random((1,2))*np.array([[1,0.15]])+np.array([[0,0.85]])
-    init=np.random.random((1,3))*np.array([[1,0.15,2*np.pi]])
+    init=np.random.random((1,3))*np.array([[1,0.15,np.pi]])
     obs=np.random.random((n_obs,2))*np.array([[1,0.5]])+np.array([[0,0.25]])
     return goal, init, obs
 
@@ -530,7 +527,7 @@ def learner_fusion(robo_network):
         
 if __name__=='__main__':
     start=time.time()
-    test_num=200
+    test_num=500
     #setup configuration
     random_seed=36
     
@@ -542,7 +539,7 @@ if __name__=='__main__':
     n_init=5
     
     #optimization parameter
-    Z=2 #number of samples for zero-th order gradient computation
+    Z=10 #number of samples for zero-th order gradient computation
     r=0.01  #step size for gradient descent   
     alpha=0.005   #Kruzkov transform 
     T=300 #maximium exploration step
