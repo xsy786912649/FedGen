@@ -393,10 +393,10 @@ class robot:
                 for t in range(T):
                     if (t in time_list) and (self.in_scope(current_x)):
                         td=(np.random.random()-0.5)*0.04
-                        td_list.append([2*td])
+                        td_list.append([td])
                         reward_t=self.run_for_gradient(current_x,E+random_seed*self.n_E,controller,t,T,td)
-                        reward_t1=self.run_for_gradient(current_x,E+random_seed*self.n_E,controller,t,T,-td)
-                        eta_list.append([reward_t-reward_t1])
+                        #reward_t1=self.run_for_gradient(current_x,E+random_seed*self.n_E,controller,t,T,-td)
+                        eta_list.append([reward_t])
                         input_list.append(np.hstack((current_x,self.goal,obs_flatten))[0])
 
                     Collision,Goal,current_x=self.run(E+random_seed*self.n_E,controller)
@@ -409,7 +409,7 @@ class robot:
                 if not Collision and not Goal:
                     eta=self.reward(current_x,t,False,True)
                 
-                delta_list=np.array(eta_list)/np.array(td_list)
+                delta_list=(np.array(eta_list)-eta)/np.array(td_list)
                 input_array=np.array(input_list)
                 delta_array=np.array(delta_list)
                 #print(input_array.shape)
