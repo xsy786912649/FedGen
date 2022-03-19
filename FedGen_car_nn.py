@@ -192,10 +192,13 @@ class robot:
     def kruzkov_transform(self,t):
         return 1-exp(-self.alpha*(t+1))
 
+    def kruzkov_transform1(self,t):
+        return t/200.0
+
     def reward(self,stop_state,t,is_goal=True, timeout=False): 
         reward0=1 
         if is_goal==True: 
-            reward0=self.kruzkov_transform(t)-1 
+            reward0=self.kruzkov_transform(t)-1
         elif timeout==True: 
             reward0= np.linalg.norm(stop_state[0,:2]-self.goal)*np.linalg.norm(stop_state[0,:2]-self.goal)/2.0 
         return reward0 
@@ -238,8 +241,6 @@ class robot:
             Goal=True
         elif any(np.linalg.norm(self.x[0,:2]-self.obs,axis=1)<self.obs_size):
             Collision=True
-        #elif self.x[0,0]>1 or self.x[0,0]<0 or self.x[0,1]>1 or self.x[0,1]<0:
-        #    Collision=True
         else:
             obs_flatten=self.obs.reshape((1,-1)) 
 
@@ -262,12 +263,7 @@ class robot:
                 break
             elif any(np.linalg.norm(x[0,:2]-self.obs,axis=1)<self.obs_size):
                 Collision=True
-                eta=1+self.reward(x,t,False,True)
                 break
-            #elif x[0,0]>1 or x[0,0]<0 or x[0,1]>1 or x[0,1]<0:
-            #    Collision=True
-            #    eta=1+self.reward(x,t,False,True)
-            #    break
             else:
                 obs_flatten=self.obs.reshape((1,-1)) 
                 input=np.hstack((x,self.goal,obs_flatten))
@@ -280,7 +276,7 @@ class robot:
         if Goal:
             eta=self.reward(x,Time_t,is_goal=True,timeout=False)
         if Collision:
-            eta=1+self.reward(x,t,False,True)
+            eta=1+self.reward(x,Time_t,False,True)
         if not Collision and not Goal:
             eta=self.reward(x,Time_t,is_goal=False,timeout=True)
         return eta 
@@ -341,6 +337,7 @@ class robot:
     def collect_y(self,T,random_seed,test_seed,controller):
         y=0
         np.random.seed(random_seed)
+        goal_number=0
         for E in range(self.n_E):
             goal, init, obs=env_config(self.n_obs,random_seed=test_seed+100*E)
             for j in range(self.n_init):
@@ -357,7 +354,7 @@ class robot:
                         eta=1+self.reward(current_x,t,False,True)
                         break
                     if Goal:   
-                        print('Goal')
+                        goal_number=goal_number+1
                         eta=self.reward(current_x,t,True,False)
                         break                      
                 if not Collision and not Goal:
@@ -366,7 +363,7 @@ class robot:
 
                 #print(eta)
                 #print(current_x)
-        
+        print("goal: "+str(goal_number*1.0/self.n_E/self.n_init))
         y=y/self.n_E/self.n_init
         self.y=y
         return y
@@ -395,10 +392,11 @@ class robot:
 
                 for t in range(T):
                     if (t in time_list) and (self.in_scope(current_x)):
-                        td=(np.random.random()-0.5)*0.06
-                        td_list.append([td])
+                        td=(np.random.random()-0.5)*0.04
+                        td_list.append([2*td])
                         reward_t=self.run_for_gradient(current_x,E+random_seed*self.n_E,controller,t,T,td)
-                        eta_list.append([reward_t])
+                        reward_t1=self.run_for_gradient(current_x,E+random_seed*self.n_E,controller,t,T,-td)
+                        eta_list.append([reward_t-reward_t1])
                         input_list.append(np.hstack((current_x,self.goal,obs_flatten))[0])
 
                     Collision,Goal,current_x=self.run(E+random_seed*self.n_E,controller)
@@ -411,9 +409,10 @@ class robot:
                 if not Collision and not Goal:
                     eta=self.reward(current_x,t,False,True)
                 
-                delta_list=(np.array(eta_list)-eta)/np.array(td_list)
+                delta_list=np.array(eta_list)/np.array(td_list)
                 input_array=np.array(input_list)
                 delta_array=np.array(delta_list)
+                #print(input_array.shape)
 
                 if isinstance(inputs,int):
                     inputs=input_array
@@ -421,6 +420,7 @@ class robot:
                 else:
                     inputs=np.vstack((inputs, input_array))
                     deltas=np.vstack((deltas, delta_array))
+        #print(inputs.shape)
         self.z= self.controller.compute_gradient(inputs,deltas)
         self.controller.update1(inputs,deltas)
         return self.z
@@ -547,7 +547,7 @@ if __name__=='__main__':
     obs_size=0.03
     goal_size=0.05
     n_E=20
-    n_init=2
+    n_init=10
     
     #optimization parameter
     Z=2 #number of samples for zero-th order gradient computation
@@ -564,7 +564,7 @@ if __name__=='__main__':
     q=np.sqrt(2*np.log(2/gamma)/n_E/n_init)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/n_init/2)
     zeta=1
-    K=50
+    K=100
     print(q,s)
     robo_network=[]
     n_robot=1

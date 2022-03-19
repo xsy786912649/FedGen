@@ -28,6 +28,7 @@ class nn_controller(torch.nn.Module):
                     torch.Tensor(1).zero_().requires_grad_(),
                 ]
         self.optimizer = torch.optim.Adam(self.params,lr=0.001,weight_decay=0.0000)
+        #self.optimizer = torch.optim.SGD(self.params,lr=0.03,weight_decay=0.0000)
 
     def dense(self, x, params):
         x = F.linear(x, params[0], params[1])
@@ -96,7 +97,7 @@ class nn_controller(torch.nn.Module):
         u_mean.backward()
         self.optimizer.step()
         return
-
+        
 def load_model(id, iteration):
     print("load"+'./pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl')
     return torch.load('./pkl/robot'+str(id)+'_'+'iteration'+str(iteration)+'.pkl')
