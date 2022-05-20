@@ -1,16 +1,29 @@
+import pybullet as pybullet
 import numpy as np
+import time
+from utils_simulation import *
+from nn_stochastic_controller import nn_stochastic_controller
+from gradient import *
 import torch
-from torch import nn 
-from torch.utils.data import Dataset,DataLoader,TensorDataset
-from torchvision import datasets, transforms
-from torch.nn import functional as F
-import math
-import random
 
+params = get_parameters()
+model= torch.load("./pkl/robot_global_iteration112.pkl")
 
+GUI = True
+random_seed = 100#
+numEnvs = 1000 # Number of environments to show videos for
+numEnvs1=100
 
-x=np.array([[1,2,3]])
-print(x[0,:2])
+husky, sphere, numRays, thetas_nominal,robotRadius=setup_pybullet(False, params)
+cost, fail_rate=environment_costs(numEnvs, model, params, husky, sphere, False, random_seed)
+print("----------------------------")
+print("fail_rate: ", fail_rate)
+print("cost: ", cost)
+pybullet.disconnect()
 
+husky, sphere, numRays, thetas_nominal,robotRadius=setup_pybullet(GUI, params)
+print("Simulating optimized controller in a few environments...")
+simulate_controller(numEnvs1, model, params, husky, sphere, GUI, random_seed)
+pybullet.disconnect()
+print("Done.")
 
-print((np.random.random()-0.5)*0.08)
