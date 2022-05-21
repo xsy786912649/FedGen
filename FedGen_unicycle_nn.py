@@ -236,7 +236,7 @@ def test_robot(robo,num,iteration_N,lock):
     robo_data['t_theta']=tt
     
     if robo_data['local_converge']:
-        controller=load_model(robo.id,robo_data['local_converge_t'+1])
+        controller=load_model(robo.id,robo_data['local_converge_t']+1)
         y,col=robo.testing_one(num,controller)
         robo_data['local_converge_test_y']=y
         robo_data['local_converge_test_col']=col
@@ -266,10 +266,10 @@ if __name__=='__main__':
     q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/2)
     zeta=1
-    K=200
+    K=150
     print(q,s)
     robo_network=[]
-    n_robot=1
+    n_robot=8
     
     #Initialization
     for i in range(n_robot):
