@@ -40,7 +40,7 @@ def compute_gradient(n_E, params, husky, sphere,controller,random_seed=None,popu
     '''
     controller.update(grad1_fin,grad2_fin)
     #print(q/2.0/popula)
-    return grad1_fin, norm
+    return grad1_fin, norm 
 
 if __name__=='__main__':
     a=1

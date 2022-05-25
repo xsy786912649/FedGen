@@ -76,7 +76,7 @@ class robot:
     def testing_one(self, num, controller):
         y=0
         col=0
-        y,col=environment_costs(num, controller, params, husky, sphere, GUI, None)
+        y,col=environment_costs(num, controller, params, husky, sphere, GUI, 1000)
         self.testing_y=y
         return y,col
 
@@ -90,7 +90,7 @@ class robot:
             t=iteration
             y,col=self.testing_one(num,controller)
             Y.append(y)
-            COL.append(col/num)
+            COL.append(col)
             tt.append(t)
             print('Testing...robot '+str(self.id)+' '+str(cnt)+'/'+str(iteration_N)+' Done!')
             cnt=cnt+1
@@ -109,7 +109,8 @@ class robot:
         lock.release()
 
         self.converge=robot_data['converge']
-        self.controller=load_model(self.id,i)
+        self.controller=load_model(self.id,i) 
+
         if not self.converge:
             self.local_converge=robot_data['local_converge']
             self.y,_=environment_costs(self.n_E*20, self.controller, params, husky, sphere, GUI, test_seed)
@@ -120,10 +121,10 @@ class robot:
             lock.release()
 
             print(str(self.id)+' local updating z ... ')
-            self.z, robot_data['z_norm']=compute_gradient(self.n_E, params, husky, sphere, self.controller) 
+            self.z, robot_data['z_norm']=compute_gradient(self.n_E, params, husky, sphere, self.controller)
             print(self.id, 'z norm = ',robot_data['z_norm'], 'Theshold = ',2*np.sqrt(self.n_theta)*self.q)
             robot_data['Y'].append(self.y)
-            if robot_data['z_norm']>= 2*np.sqrt(self.n_theta)*self.q: 
+            if robot_data['z_norm']>= 2*np.sqrt(self.n_theta)*self.q:
                 #self.controller.update(self.z)
                 self.Y.append(self.y)
                 self.controller.save_model(self.id, i+1)
@@ -138,6 +139,8 @@ class robot:
                     self.controller.save_model(self.id, i+1)
                     robot_data['local_converge']=True
                     robot_data['local_converge_t']=i
+                else:
+                    self.controller.save_model(self.id, i+1)
 
             lock.acquire()
             fw=open(file,'wb')                
@@ -150,6 +153,10 @@ class robot:
         return
 
 def cloud_update(file_global,robo_network,iteration):
+    if iteration>0:
+        controller_current=load_model_global(iteration-1)
+        controller_current.save_model_global(iteration)
+
     for robo in robo_network:
         try:
             f=open(file_global,'rb')
@@ -169,7 +176,7 @@ def cloud_update(file_global,robo_network,iteration):
                 global_min['y']=robo.y
                 global_min['s']=robo.s
                 global_min['id']=robo.id
-                controller_current=load_model(robo.id,iteration)
+                controller_current=load_model(robo.id,iteration+1)
                 controller_current.save_model_global(iteration)
                 # global_min=np.array([robo.y,robo.s, robo.id])
                 f=open(file_global,'wb')
@@ -211,12 +218,12 @@ def learner_fusion(robo_network,iteration):
             #robo.theta_=global_min['theta']
             robo.zeta=y_j
             robo.converge=False
-            robo_data['converge']=robo.converge
+            robo_data['converge']=False
             #robo.controller.save_model(robo.id,iteration+1)
             #robo_data['theta']=robo.theta_
             robo_data['zeta']=y_j
             robo_data['switch']=True
-            #robo_data['Switch'].append((iteration,robo.theta_))
+            robo_data['Switch'].append(iteration)
             print('Robot ', robo.id, 'Switched to ',id_j,'!!!!')
         
         print('Robot '+str(robo.id)+' theta updated!')
@@ -230,6 +237,7 @@ def test_robot(robo,num,iteration_N,lock):
     file='./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl'
     f=open(file,'rb')
     robo_data=pickle.load(f)
+    f.close()
     tt=robo.testing_all(num,iteration_N)
     robo_data['testing_Y']=robo.testing_Y
     robo_data['testing_col']=robo.testing_col
@@ -244,32 +252,36 @@ def test_robot(robo,num,iteration_N,lock):
     fw=open('./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl','wb')
     pickle.dump(robo_data,fw)
     fw.close()
-    plt.plot(robo.testing_Y)
-    plt.title('Robot '+str(robo.id))
+    ##print(tt)
+    #plt.plot(robo.testing_Y)
+    #plt.title('Robot '+str(robo.id))
 
 
 if __name__=='__main__':
     start=time.time()
-    test_num=1000
+    test_num=200
     #setup configuration
     #random_seed=36
     #environment parameter
     n_obs=1
     n_E=10
     
-    np.random.seed(10)  
-    
     #FedGen parameter
     gamma=0.01
-    ell=0.03 #0.003 #Lipschitz constant
+    ell=0.06 #0.03 #Lipschitz constant
     
     q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
-    s=np.sqrt(np.log(2/gamma)/n_E/2)
+    s=np.sqrt(np.log(2/gamma)/n_E/2)/10.0
     zeta=1
-    K=150
+    K=200
     print(q,s)
+
     robo_network=[]
     n_robot=8
+
+    file_global='./pkl/global_minimum'+str(n_obs)+'obs'+'.pkl'
+    Process=[]
+    lock = mp.Lock()
     
     #Initialization
     for i in range(n_robot):
@@ -280,14 +292,17 @@ if __name__=='__main__':
         robo=robot(n_E,n_obs,theta_size,q,s,i,zeta,controller) #(self,n_E,n_obs,n_theta,q,s,robo_id,zeta,controller): 
         robo_network.append(robo)
     
-    bias=0
-    file_global='./pkl/global_minimum'+str(n_obs)+'obs'+'.pkl'
-    Process=[]
-    lock = mp.Lock()
+
     #FedGen algorithm
     for i in range(K):
         print('Iteration '+str(i))
         for robo in robo_network:
+
+            if i>120:
+                ell=0.035 #0.03 #Lipschitz constant
+                robo.q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
+                robo.s=np.sqrt(np.log(2/gamma)/n_E/2)/50.0
+
             p=mp.Process(target=robo.local_update, args=(i,lock,10,))  #local_update(self,i,lock,test_seed):
             Process.append(p)
             p.start()
@@ -296,13 +311,6 @@ if __name__=='__main__':
         cloud_update(file_global,robo_network,i)
         learner_fusion(robo_network,i)
 
-    '''
-    #draw
-        print("draw...................")
-        for robo in robo_network:
-            robo.testing_and_draw(T,3,K)
-    '''
-    
     #testing ..........................................
     print('testing............')
     Robot_Y=[]
@@ -316,18 +324,42 @@ if __name__=='__main__':
     for p in P_test:
         p.join()
     print('Done testing.')
-    
-    for robo in robo_network:
-        file='./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl'
+
+
+    for id in range(n_robot):
+        file='./pkl/robot'+str(id)+'_'+str(n_obs)+'obs'+'.pkl'
         f=open(file,'rb')
         robo_data=pickle.load(f)
-        
+        f.close()
         Y=robo_data['testing_Y']
-        COL=robo_data['testing_col']
         tt=robo_data['t_theta']
-        plt.plot(tt,Y,label='Robot '+str(robo.id))
-#        if robo_data['local_converge']:
-#            y_converge=robo_data['local_converge_test_y']    
-#            plt.plot(np.linspace(0,len(Y),100),y_converge*np.ones((100,)),'--')
+        plt.plot(tt,Y,label='Robot '+str(id))
+        switch=robo_data['Switch']
+        y_swith=[]
+        t_swith=[]
+        for t in tt:
+            if t in switch:
+                y_swith.append(Y[t])
+                t_swith.append(t)
+        plt.plot(t_swith,y_swith,'o',color='r')
         plt.legend()
-#        print(robo.Y)
+    plt.show()
+
+    for id in range(n_robot):
+        file='./pkl/robot'+str(id)+'_'+str(n_obs)+'obs'+'.pkl'
+        f=open(file,'rb')
+        robo_data=pickle.load(f)
+        f.close()
+        COL=np.array(robo_data['testing_col'])
+        tt=robo_data['t_theta']
+        plt.plot(tt,COL,label='Robot '+str(id))
+        switch=robo_data['Switch']
+        y_swith=[]
+        t_swith=[]
+        for t in tt:
+            if t in switch:
+                y_swith.append(COL[t])
+                t_swith.append(t)
+        plt.plot(t_swith,y_swith,'o',color='r')
+        plt.legend()
+    plt.show()

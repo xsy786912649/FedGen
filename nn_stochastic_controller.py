@@ -6,7 +6,7 @@ from torchvision import datasets, transforms
 from torch.nn import functional as F
 import math
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 class nn_stochastic_controller(torch.nn.Module):
     def __init__(self,numRays):
@@ -167,7 +167,7 @@ class nn_stochastic_controller(torch.nn.Module):
         #print(grad2[0])
         return grad1,grad2
 
-    def update(self,grd1,grd2,lr=0.01,lr2=0.001):
+    def update(self,grd1,grd2,lr=0.003,lr2=0.001):
         params_new = [(self.params[i] - lr*grd1[i]) for i in range(len(self.params))]
         self.params=params_new
         params2_new = [(self.params2[i] - lr2*grd2[i]) for i in range(len(self.params2))]
