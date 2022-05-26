@@ -273,7 +273,7 @@ if __name__=='__main__':
     q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/2)/10.0
     zeta=1
-    K=150
+    K=200
     print(q,s)
 
     robo_network=[]
@@ -298,7 +298,7 @@ if __name__=='__main__':
         print('Iteration '+str(i))
         for robo in robo_network:
 
-            if i>70:
+            if i>100:
                 ell=0.035 #0.03 #Lipschitz constant
                 robo.q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
                 robo.s=np.sqrt(np.log(2/gamma)/n_E/2)/50.0
