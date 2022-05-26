@@ -44,8 +44,10 @@ for id in range(n_robot):
     f=open(file,'rb')
     robo_data=pickle.load(f)
     f.close()
+    
     Y=robo_data['testing_Y']
     tt=robo_data['t_theta']
+    #tt=list(range(K))
     plt.plot(tt,Y,label='Robot '+str(id))
     switch=robo_data['Switch']
     y_swith=[]
@@ -65,6 +67,7 @@ for id in range(n_robot):
     f.close()
     COL=np.array(robo_data['testing_col'])
     tt=robo_data['t_theta']
+    #tt=list(range(K))
     plt.plot(tt,COL,label='Robot '+str(id))
     switch=robo_data['Switch']
     y_swith=[]

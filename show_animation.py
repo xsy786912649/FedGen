@@ -7,7 +7,7 @@ from gradient import *
 import torch
 
 params = get_parameters()
-model= torch.load("./pkl/robot_global_iteration199.pkl")
+model= torch.load("./pkl/robot_global_iteration149.pkl")
 
 GUI = True
 random_seed = 100#

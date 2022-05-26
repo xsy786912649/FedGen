@@ -213,7 +213,7 @@ def learner_fusion(robo_network,iteration):
         robo.controller=load_model(robo.id,iteration+1)
         robo.zeta=robo_data['zeta']
         robo.converge=robo_data['converge']
-        if robo.id != id_j and y_j+s_j< robo.zeta and  y_j+s_j< robo.y-robo.s and robo.z_norm<2*np.sqrt(robo.n_theta)*robo.q:
+        if robo.id != id_j and y_j+s_j< robo.zeta and  y_j+s_j< robo.y-robo.s and robo.converge==True:
             robo.controller=load_model_global(iteration)
             #robo.theta_=global_min['theta']
             robo.zeta=y_j
@@ -273,7 +273,7 @@ if __name__=='__main__':
     q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
     s=np.sqrt(np.log(2/gamma)/n_E/2)/10.0
     zeta=1
-    K=200
+    K=150
     print(q,s)
 
     robo_network=[]
@@ -298,7 +298,7 @@ if __name__=='__main__':
         print('Iteration '+str(i))
         for robo in robo_network:
 
-            if i>120:
+            if i>70:
                 ell=0.035 #0.03 #Lipschitz constant
                 robo.q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
                 robo.s=np.sqrt(np.log(2/gamma)/n_E/2)/50.0
