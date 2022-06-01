@@ -72,6 +72,7 @@ class robot:
         robot_data['testing_runningtime']=None
         robot_data['local_converge_test_y']=None
         robot_data['local_converge_test_col']=None
+        robo_data['local_converge_test_runningtime']=None
         robot_data['zeta']=1
         pickle.dump(robot_data,f)
 
@@ -255,9 +256,10 @@ def test_robot(robo,num,iteration_N,lock):
     
     if robo_data['local_converge']:
         controller=load_model(robo.id,robo_data['local_converge_t']+1)
-        y,col=robo.testing_one(num,controller)
+        y,col,runningtime=robo.testing_one(num,controller)
         robo_data['local_converge_test_y']=y
         robo_data['local_converge_test_col']=col
+        robo_data['local_converge_test_runningtime']=runningtime
     
     fw=open('./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl','wb')
     pickle.dump(robo_data,fw)
