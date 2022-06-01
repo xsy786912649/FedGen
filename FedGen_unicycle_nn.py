@@ -46,6 +46,7 @@ class robot:
         self.testing_Y=None
         self.testing_y=None
         self.testing_col=None
+        self.testing_runningtime=None
         self.local_converge=False
         #self.local_converge_theta=None
         
@@ -68,6 +69,7 @@ class robot:
         #robot_data['local_converge_theta']=None
         robot_data['testing_Y']=None
         robot_data['testing_col']=None
+        robot_data['testing_runningtime']=None
         robot_data['local_converge_test_y']=None
         robot_data['local_converge_test_col']=None
         robot_data['zeta']=1
@@ -76,27 +78,32 @@ class robot:
     def testing_one(self, num, controller):
         y=0
         col=0
-        y,col=environment_costs(num, controller, params, husky, sphere, GUI, 1000)
+        y,col,runningtime=environment_runtime_cost(num, controller, params, husky, sphere, GUI, 1000)
         self.testing_y=y
-        return y,col
+        return y,col,runningtime
 
     def testing_all(self,num,iteration_N):
         Y=[]
         COL=[]
+        Runningtime=[]
         cnt=1
         tt=[]
         for iteration in range(iteration_N):
+            pybullet.disconnect()
+            setup_pybullet(False, params)
             controller=load_model(self.id,iteration)
             t=iteration
-            y,col=self.testing_one(num,controller)
+            y,col,runningtime=self.testing_one(num,controller)
             Y.append(y)
             COL.append(col)
+            Runningtime.append(runningtime)
             tt.append(t)
             print('Testing...robot '+str(self.id)+' '+str(cnt)+'/'+str(iteration_N)+' Done!')
             cnt=cnt+1
         print('Robot '+str(self.id)+' completes testing !!!!')
         self.testing_Y=Y
         self.testing_col=COL
+        self.testing_runningtime=Runningtime
         return tt
 
     def local_update(self,i,lock,test_seed):
@@ -234,6 +241,8 @@ def learner_fusion(robo_network,iteration):
         fw.close()
 
 def test_robot(robo,num,iteration_N,lock):
+    pybullet.disconnect()
+    setup_pybullet(False, params)
     file='./pkl/robot'+str(robo.id)+'_'+str(robo.n_obs)+'obs'+'.pkl'
     f=open(file,'rb')
     robo_data=pickle.load(f)
@@ -241,6 +250,7 @@ def test_robot(robo,num,iteration_N,lock):
     tt=robo.testing_all(num,iteration_N)
     robo_data['testing_Y']=robo.testing_Y
     robo_data['testing_col']=robo.testing_col
+    robo_data['testing_runningtime']=robo.testing_runningtime
     robo_data['t_theta']=tt
     
     if robo_data['local_converge']:
@@ -255,11 +265,11 @@ def test_robot(robo,num,iteration_N,lock):
     ##print(tt)
     #plt.plot(robo.testing_Y)
     #plt.title('Robot '+str(robo.id))
-
+    
 
 if __name__=='__main__':
     start=time.time()
-    test_num=200
+    test_num=5000
     #setup configuration
     #random_seed=36
     #environment parameter
@@ -268,13 +278,15 @@ if __name__=='__main__':
     
     #FedGen parameter
     gamma=0.01
-    ell=0.06 #0.03 #Lipschitz constant
+    ell=0.1 #0.03 #Lipschitz constant
     
     q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
-    s=np.sqrt(np.log(2/gamma)/n_E/2)/10.0
+    s=np.sqrt(np.log(2/gamma)/n_E/2)/7.5
     zeta=1
-    K=200
+    K=220
+    theta_size=21*20
     print(q,s)
+    print(2*np.sqrt(theta_size)*q)
 
     robo_network=[]
     n_robot=8
@@ -287,7 +299,7 @@ if __name__=='__main__':
     for i in range(n_robot):
         #initialize theta
         controller=nn_stochastic_controller(numRays)
-        theta_size=21
+        theta_size=21*20
         #initialize robot
         robo=robot(n_E,n_obs,theta_size,q,s,i,zeta,controller) #(self,n_E,n_obs,n_theta,q,s,robo_id,zeta,controller): 
         robo_network.append(robo)
@@ -299,9 +311,9 @@ if __name__=='__main__':
         for robo in robo_network:
 
             if i>100:
-                ell=0.035 #0.03 #Lipschitz constant
+                ell=0.05 #0.03 #Lipschitz constant
                 robo.q=np.sqrt(2*np.log(2/gamma)/n_E)*ell
-                robo.s=np.sqrt(np.log(2/gamma)/n_E/2)/50.0
+                robo.s=np.sqrt(np.log(2/gamma)/n_E/2)/100.0
 
             p=mp.Process(target=robo.local_update, args=(i,lock,10,))  #local_update(self,i,lock,test_seed):
             Process.append(p)
@@ -359,6 +371,25 @@ if __name__=='__main__':
         for t in tt:
             if t in switch:
                 y_swith.append(COL[t])
+                t_swith.append(t)
+        plt.plot(t_swith,y_swith,'o',color='r')
+        plt.legend()
+    plt.show()
+
+    for id in range(n_robot):
+        file='./pkl/robot'+str(id)+'_'+str(n_obs)+'obs'+'.pkl'
+        f=open(file,'rb')
+        robo_data=pickle.load(f)
+        f.close()
+        running=np.array(robo_data['testing_runningtime'])
+        tt=robo_data['t_theta']
+        plt.plot(tt,running,label='Robot '+str(id))
+        switch=robo_data['Switch']
+        y_swith=[]
+        t_swith=[]
+        for t in tt:
+            if t in switch:
+                y_swith.append(running[t])
                 t_swith.append(t)
         plt.plot(t_swith,y_swith,'o',color='r')
         plt.legend()

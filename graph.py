@@ -79,3 +79,23 @@ for id in range(n_robot):
     plt.plot(t_swith,y_swith,'o',color='r')
     plt.legend()
 plt.show()
+
+
+for id in range(n_robot):
+    file='./pkl/robot'+str(id)+'_'+str(n_obs)+'obs'+'.pkl'
+    f=open(file,'rb')
+    robo_data=pickle.load(f)
+    f.close()
+    RUN=np.array(robo_data['testing_runningtime'])
+    tt=robo_data['t_theta']
+    plt.plot(tt,RUN,label='Robot '+str(id))
+    switch=robo_data['Switch']
+    y_swith=[]
+    t_swith=[]
+    for t in tt:
+        if t in switch:
+            y_swith.append(RUN[t])
+            t_swith.append(t)
+    plt.plot(t_swith,y_swith,'o',color='r')
+    plt.legend()
+plt.show()

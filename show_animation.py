@@ -7,12 +7,15 @@ from gradient import *
 import torch
 
 params = get_parameters()
-model= torch.load("./pkl/robot_global_iteration149.pkl")
+model= torch.load("./pkl/robot0_iteration220.pkl")
+#model= torch.load("./pkl/robot0_iteration110.pkl")
+#model= torch.load("./pkl/robot0_iteration0.pkl")
 
 GUI = True
-random_seed = 100#
-numEnvs = 1000 # Number of environments to show videos for
-numEnvs1=100
+random_seed = 2#
+numEnvs = 100 # Number of environments to show videos for
+numEnvs1=1
+
 
 husky, sphere, numRays, thetas_nominal,robotRadius=setup_pybullet(False, params)
 cost, fail_rate=environment_costs(numEnvs, model, params, husky, sphere, False, random_seed)
@@ -23,7 +26,7 @@ pybullet.disconnect()
 
 husky, sphere, numRays, thetas_nominal,robotRadius=setup_pybullet(GUI, params)
 print("Simulating optimized controller in a few environments...")
-simulate_controller(numEnvs1, model, params, husky, sphere, GUI, random_seed)
+simulate_controller_write(numEnvs1, model, params, husky, sphere, GUI, random_seed)
 pybullet.disconnect()
 print("Done.")
 

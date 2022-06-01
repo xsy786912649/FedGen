@@ -15,7 +15,7 @@ class nn_stochastic_controller(torch.nn.Module):
         self.v0 = 2.5
         self.u_diff_max = 0.5*(self.v0/self.r) 
         self.numRays=numRays
-        """
+
         self.params = [
                     torch.Tensor(20, self.numRays).uniform_(-0.1/5,0.1/5),
                     torch.Tensor(20).zero_(),
@@ -37,7 +37,7 @@ class nn_stochastic_controller(torch.nn.Module):
                     torch.Tensor(1, 20).uniform_(0.08/5, 0.1/5),
                     torch.Tensor(1).uniform_(0.08/5, 0.1/5),
                 ]
-        """
+        '''
         self.params = [
                     torch.Tensor(1, self.numRays).uniform_(-0.1,0.1),
                     torch.Tensor(1).zero_(),
@@ -47,7 +47,7 @@ class nn_stochastic_controller(torch.nn.Module):
                     torch.Tensor(1, self.numRays).uniform_(0.08, 0.1),
                     torch.Tensor(1).uniform_(0.08, 0.1),
                 ]
-        
+        '''
         self.random_parameter_posi=[
                 ]
 
@@ -102,9 +102,9 @@ class nn_stochastic_controller(torch.nn.Module):
 
     def dense(self, x, params):
         x = F.linear(x, params[0], params[1])
-        #x = F.relu(x)
+        x = F.relu(x)
 
-        #x = F.linear(x, params[2], params[3])
+        x = F.linear(x, params[2], params[3])
         #x = F.relu(x)
 
         #x = F.linear(x, params[2], params[3])
@@ -167,7 +167,7 @@ class nn_stochastic_controller(torch.nn.Module):
         #print(grad2[0])
         return grad1,grad2
 
-    def update(self,grd1,grd2,lr=0.005,lr2=0.001):
+    def update(self,grd1,grd2,lr=0.01,lr2=0.001):
         params_new = [(self.params[i] - lr*grd1[i]) for i in range(len(self.params))]
         self.params=params_new
         params2_new = [(self.params2[i] - lr2*grd2[i]) for i in range(len(self.params2))]

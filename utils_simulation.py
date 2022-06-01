@@ -146,6 +146,92 @@ def generate_obstacles(p, heightObs, robotRadius):
     
     return obsUid
 
+
+def generate_obstacles_write(p, heightObs, robotRadius):
+    # First create bounding obstacles
+    x_lim = [-5.0, 5.0]
+    y_lim = [0.0, 10.0]
+        
+    numObs = 15+np.random.randint(0,11) # 30 
+    # radiusObs = 0.15
+    massObs = 0
+    visualShapeId = -1
+    linkMasses = [None]*(numObs+3) # +3 is because we have three bounding walls
+    colIdxs = [None]*(numObs+3)
+    visIdxs = [None]*(numObs+3)
+    posObs = [None]*(numObs+3)
+    orientObs = [None]*(numObs+3)
+    parentIdxs = [None]*(numObs+3)
+    
+    linkInertialFramePositions = [None]*(numObs+3)
+    linkInertialFrameOrientations = [None]*(numObs+3)
+    linkJointTypes = [None]*(numObs+3)
+    linkJointAxis = [None]*(numObs+3)
+
+    for obs in range(numObs):
+        
+        linkMasses[obs] = 0.0
+        visIdxs[obs] = -1 # p.createVisualShape(p.GEOM_CYLINDER,radiusObs,[1,1,1],heightObs,rgbaColor=[0,0,0,1])
+        parentIdxs[obs] = 0
+    
+        linkInertialFramePositions[obs] = [0,0,0]
+        linkInertialFrameOrientations[obs] = [0,0,0,1]
+        linkJointTypes[obs] = p.JOINT_FIXED
+        linkJointAxis[obs] = np.array([0,0,1]) # [None]*numObs
+        
+        posObs_obs = np.array([None]*3)
+        posObs_obs[0] = x_lim[0] + (x_lim[1] - x_lim[0])*np.random.random_sample(1) 
+        posObs_obs[1] = 2.0 + y_lim[0] + (y_lim[1] - y_lim[0] - 2.0)*np.random.random_sample(1) # Push up a bit
+        posObs_obs[2] = 0 # set z at ground level
+        posObs[obs] = posObs_obs # .tolist()
+        orientObs[obs] = [0,0,0,1]
+        radiusObs=(0.20 - 0.1)*np.random.random_sample(1)+0.1
+        colIdxs[obs] = p.createCollisionShape(p.GEOM_CYLINDER,radius=radiusObs,height=heightObs)
+        print(float(posObs_obs[0]),float(posObs_obs[1]),float(radiusObs))
+        # colIdxs[obs] = p.createCollisionShape(p.GEOM_CYLINDER,radius=radiusObs,height=heightObs)
+
+    # Create bounding objects
+    # Left wall
+    linkMasses[numObs] = 0.0
+    visIdxs[numObs] = -1 # p.createVisualShape(p.GEOM_BOX, halfExtents = [0.1, (y_lim[1] - y_lim[0])/2.0, heightObs/2], rgbaColor=[0.8,0.1,0.1,1.0]) # -1
+    parentIdxs[numObs] = 0
+    linkInertialFramePositions[numObs] = [0,0,0]
+    linkInertialFrameOrientations[numObs] = [0,0,0,1]
+    linkJointTypes[numObs] = p.JOINT_FIXED
+    linkJointAxis[numObs] = np.array([0,0,1]) 
+    posObs[numObs] = [x_lim[0], (y_lim[0]+y_lim[1])/2.0, 0.0]
+    orientObs[numObs] = [0,0,0,1]
+    colIdxs[numObs] = p.createCollisionShape(p.GEOM_BOX, halfExtents = [0.1, (y_lim[1] - y_lim[0])/2.0, heightObs/2])
+    
+    
+    # Right wall
+    linkMasses[numObs+1] = 0.0
+    visIdxs[numObs+1] = -1 # p.createVisualShape(p.GEOM_BOX, halfExtents = [0.1, (y_lim[1] - y_lim[0])/2.0, heightObs/2], rgbaColor=[0.8,0.1,0.1,1.0]) # -1
+    parentIdxs[numObs+1] = 0
+    linkInertialFramePositions[numObs+1] = [0,0,0]
+    linkInertialFrameOrientations[numObs+1] = [0,0,0,1]
+    linkJointTypes[numObs+1] = p.JOINT_FIXED
+    linkJointAxis[numObs+1] = np.array([0,0,1]) 
+    posObs[numObs+1] = [x_lim[1], (y_lim[0]+y_lim[1])/2.0, 0.0]
+    orientObs[numObs+1] = [0,0,0,1]
+    colIdxs[numObs+1] = p.createCollisionShape(p.GEOM_BOX, halfExtents = [0.1, (y_lim[1] - y_lim[0])/2.0, heightObs/2])
+    
+    # Bottom wall
+    linkMasses[numObs+2] = 0.0
+    visIdxs[numObs+2] = -1 # p.createVisualShape(p.GEOM_BOX, halfExtents = [0.1, (x_lim[1] - x_lim[0])/2.0, heightObs/2], rgbaColor=[0.8,0.1,0.1,1.0])
+    parentIdxs[numObs+2] = 0
+    linkInertialFramePositions[numObs+2] = [0,0,0]
+    linkInertialFrameOrientations[numObs+2] = [0,0,0,1]
+    linkJointTypes[numObs+2] = p.JOINT_FIXED
+    linkJointAxis[numObs+2] = np.array([0,0,1]) 
+    posObs[numObs+2] = [(x_lim[0]+x_lim[1])/2.0, y_lim[0], 0.0]
+    orientObs[numObs+2] = [0,0,np.sqrt(2)/2,np.sqrt(2)/2]
+    colIdxs[numObs+2] = p.createCollisionShape(p.GEOM_BOX, halfExtents = [0.1, (x_lim[1] - x_lim[0])/2.0, heightObs/2])        
+        
+    obsUid = p.createMultiBody(baseCollisionShapeIndex = -1, baseVisualShapeIndex = -1, basePosition = [0,0,0], baseOrientation = [0,0,0,1], baseInertialFramePosition = [0,0,0], baseInertialFrameOrientation = [0,0,0,1], linkMasses = linkMasses, linkCollisionShapeIndices = colIdxs, linkVisualShapeIndices = visIdxs, linkPositions = posObs, linkOrientations = orientObs, linkParentIndices = parentIdxs, linkInertialFramePositions = linkInertialFramePositions, linkInertialFrameOrientations = linkInertialFrameOrientations, linkJointTypes = linkJointTypes, linkJointAxis = linkJointAxis)
+    
+    return obsUid
+
 # Simulate range sensor (get distances along rays)        
 def getDistances(p, state, robotHeight, numRays, senseRadius, thetas_nominal): 
 
@@ -344,7 +430,97 @@ def environment_costs(numEnvs, controller, params, husky, sphere, GUI, seed, mod
 
     return np.average(costs,axis=None), np.average(success,axis=None)
 
+def environment_runtime_cost(numEnvs, controller, params, husky, sphere, GUI, seed, mode=0):
+    
+    # Parameters
+    numRays = params['numRays']
+    senseRadius = params['senseRadius']   
+    robotRadius = params['robotRadius']
+    robotHeight = params['robotHeight']
+    thetas_nominal = params['thetas_nominal']
+    T_horizon = params['T_horizon']
+    
+    # Fix random seed for consistency of results
+    np.random.seed(seed)
+    
+    # Initialize costs for the different environments and different controllers
+    costs = np.zeros((numEnvs))
+    success= np.zeros((numEnvs))
+    runtime= np.zeros((numEnvs))
+    
+    for env in range(0, numEnvs):
+                
+        if (env%100 == 0) and (env>0):
+            print(env, "out of", numEnvs)
+    
+        # Sample environment
+        heightObs = 20*robotHeight
+        obsUid = generate_obstacles(pybullet, heightObs, robotRadius)  
 
+        # Initialize position of robot
+        state = [0.0, 1.0, 0.0] # [x, y, theta]
+        quat = pybullet.getQuaternionFromEuler([0.0, 0.0, state[2]+np.pi/2]) # pi/2 since Husky visualization is rotated by pi/2
+
+        pybullet.resetBasePositionAndOrientation(husky, [state[0], state[1], 0.0], quat)
+        pybullet.resetBasePositionAndOrientation(sphere, [state[0], state[1], robotHeight], [0,0,0,1])        
+
+        # Cost for this particular controller (lth controller) in this environment
+        cost_env_l = 1.0
+        success_env= 0.0
+        runtime_env=1.0
+
+        for t in range(0, T_horizon):
+
+            # Get sensor measurement
+            y = getDistances(pybullet, state, robotHeight, numRays, senseRadius, thetas_nominal)
+
+            # Compute control input
+            u = controller.predict(y,mode)
+            #print(u)
+
+            # Update state
+            state = robot_update_state(state, u)
+
+            # Update position of pybullet object
+            quat = pybullet.getQuaternionFromEuler([0.0, 0.0, state[2]+np.pi/2]) # pi/2 since Husky visualization is rotated by pi/2
+            pybullet.resetBasePositionAndOrientation(husky, [state[0], state[1], 0.0], quat)
+            pybullet.resetBasePositionAndOrientation(sphere, [state[0], state[1], robotHeight], [0,0,0,1])    
+
+            if (GUI):
+                pybullet.resetDebugVisualizerCamera(cameraDistance=5.0, cameraYaw=0.0, cameraPitch=-45.0, cameraTargetPosition=[state[0], state[1], 2*robotHeight])
+
+                time.sleep(0.025) 
+
+
+            # Check if the robot is in collision. If so, cost = 1.0.      
+            # Get closest points. Note: Last argument is distance threshold. Since it's set to 0, the function will only return points if the distance is less than zero. So, closestPoints is non-empty iff there is a collision.
+            closestPoints = pybullet.getClosestPoints(sphere, obsUid, 0.0)
+            if (10.0-float(state[1]))/10.0< cost_env_l:
+                cost_env_l = (10.0-float(state[1]))/10.0
+            
+            mindis_cost=(-np.min(np.array(y)[0])/5.0+1.0)/5.0
+            #mindis_cost=0
+            # See if the robot is in collision. If so, cost = 1.0. 
+            if closestPoints: # Check if closestPoints is non-empty 
+                success_env = 1.0
+                cost_env_l+=0.1
+                runtime_env=1.0
+
+                break
+
+            if state[1]>10.1:
+                runtime_env=1-np.exp(-0.1*0.05*t)
+                break
+            
+        # Record cost for this environment and this controller
+        costs[env] = max(cost_env_l,0)
+        success[env] = success_env
+        runtime[env] = runtime_env
+            
+        # Remove obstacles
+        pybullet.removeBody(obsUid)
+
+    return np.average(costs,axis=None), np.average(success,axis=None),  np.average(runtime,axis=None)
 
 
 # Compute expected cost (just a utility function)
@@ -427,7 +603,77 @@ def simulate_controller(numEnvs, controller, params, husky, sphere, GUI, seed, m
         pybullet.removeBody(obsUid)
     
     return True
-       
+
+def simulate_controller_write(numEnvs, controller, params, husky, sphere, GUI, seed, mode=0):
+    
+    # Parameters
+    numRays = params['numRays']
+    senseRadius = params['senseRadius']   
+    robotRadius = params['robotRadius']
+    robotHeight = params['robotHeight']
+    thetas_nominal = params['thetas_nominal']
+    T_horizon = params['T_horizon']
+    
+    # Fix random seed for consistency of results
+    np.random.seed(seed)
+    
+    for env in range(0,numEnvs):
+        print(env)
+        # Sample environment
+        heightObs = 20*robotHeight
+        obsUid = generate_obstacles_write(pybullet, heightObs, robotRadius)
+            
+        # Initialize position of robot
+        state = [0.0, 1.0, 0.0] # [x, y, theta]
+        quat = pybullet.getQuaternionFromEuler([0.0, 0.0, state[2]+np.pi/2]) # pi/2 since Husky visualization is rotated by pi/2
+
+        pybullet.resetBasePositionAndOrientation(husky, [state[0], state[1], 0.0], quat)
+        pybullet.resetBasePositionAndOrientation(sphere, [state[0], state[1], robotHeight], [0,0,0,1])        
+
+        cost_env_l=1
+        for t in range(0, T_horizon):
+
+            # Get sensor measurement
+            y = getDistances(pybullet, state, robotHeight, numRays, senseRadius, thetas_nominal)
+
+            # Compute control input
+            u = controller.predict(y,mode)
+            
+            # Update state
+            state = robot_update_state(state, u)
+            print(state[0],state[1])
+
+            # Update position of pybullet object
+            quat = pybullet.getQuaternionFromEuler([0.0, 0.0, state[2]+np.pi/2]) # pi/2 since Husky visualization is rotated by pi/2
+            pybullet.resetBasePositionAndOrientation(husky, [state[0], state[1], 0.0], quat)
+            pybullet.resetBasePositionAndOrientation(sphere, [state[0], state[1], robotHeight], [0,0,0,1])    
+
+            if (GUI):
+                pybullet.resetDebugVisualizerCamera(cameraDistance=5.0, cameraYaw=0.0, cameraPitch=-45.0, cameraTargetPosition=[state[0], state[1], 2*robotHeight])
+
+                time.sleep(0.025) 
+
+
+            # Check if the robot is in collision. If so, cost = 1.0.      
+            # Get closest points. Note: Last argument is distance threshold. Since it's set to 0, the function will only return points if the distance is less than zero. So, closestPoints is non-empty iff there is a collision.
+            closestPoints = pybullet.getClosestPoints(sphere, obsUid, 0.0)
+
+            if (10.0-float(state[1]))/10.0< cost_env_l:
+                cost_env_l = (10.0-float(state[1]))/10.0
+            # See if the robot is in collision. If so, cost = 1.0. 
+            if closestPoints: # Check if closestPoints is non-empty 
+                print("collision")
+                cost_env_l+=0.1
+                break 
+            if state[1]>10.1:
+                break
+
+        cost_env_l =max(cost_env_l,0)
+        print(cost_env_l)
+        # Remove obstacles
+        pybullet.removeBody(obsUid)
+    
+    return True
     
 def setup_pybullet(GUI, params):
     # pyBullet
