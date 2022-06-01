@@ -72,7 +72,7 @@ class robot:
         robot_data['testing_runningtime']=None
         robot_data['local_converge_test_y']=None
         robot_data['local_converge_test_col']=None
-        robo_data['local_converge_test_runningtime']=None
+        robot_data['local_converge_test_runningtime']=None
         robot_data['zeta']=1
         pickle.dump(robot_data,f)
 
