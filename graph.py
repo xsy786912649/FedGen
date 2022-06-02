@@ -66,6 +66,7 @@ for id in range(n_robot):
     robo_data=pickle.load(f)
     f.close()
     COL=np.array(robo_data['testing_col'])
+    print(COL)
     tt=robo_data['t_theta']
     #tt=list(range(K))
     plt.plot(tt,COL,label='Robot '+str(id))

@@ -7,13 +7,13 @@ from gradient import *
 import torch
 
 params = get_parameters()
-model= torch.load("./pkl/robot0_iteration220.pkl")
+model= torch.load("./pkl/robot1_iteration220.pkl")
 #model= torch.load("./pkl/robot0_iteration110.pkl")
 #model= torch.load("./pkl/robot0_iteration0.pkl")
 
 GUI = True
 random_seed = 2#
-numEnvs = 100 # Number of environments to show videos for
+numEnvs = 10000 # Number of environments to show videos for
 numEnvs1=1
 
 

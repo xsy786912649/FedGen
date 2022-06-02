@@ -271,7 +271,7 @@ def test_robot(robo,num,iteration_N,lock):
 
 if __name__=='__main__':
     start=time.time()
-    test_num=5000
+    test_num=2000
     #setup configuration
     #random_seed=36
     #environment parameter
