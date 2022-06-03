@@ -79,7 +79,7 @@ class robot:
     def testing_one(self, num, controller):
         y=0
         col=0
-        y,col,runningtime=environment_runtime_cost(num, controller, params, husky, sphere, GUI, 1000)
+        y,col,runningtime=environment_runtime_cost(num, controller, params, husky, sphere, GUI, 10)
         self.testing_y=y
         return y,col,runningtime
 
@@ -306,7 +306,6 @@ if __name__=='__main__':
         robo=robot(n_E,n_obs,theta_size,q,s,i,zeta,controller) #(self,n_E,n_obs,n_theta,q,s,robo_id,zeta,controller): 
         robo_network.append(robo)
     
-
     #FedGen algorithm
     for i in range(K):
         print('Iteration '+str(i))
