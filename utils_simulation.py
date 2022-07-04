@@ -509,7 +509,7 @@ def environment_runtime_cost(numEnvs, controller, params, husky, sphere, GUI, se
                 break
 
             if state[1]>10.1:
-                runtime_env=1-np.exp(-0.1*0.05*t)
+                runtime_env=1-np.exp(-0.001*0.05*t)
                 break
             
         # Record cost for this environment and this controller
